@@ -35,6 +35,38 @@
     will-change: transform, box-shadow;
   }
 
+  .animate-scissor {
+    animation: scissorSnip 1.4s ease-in-out infinite;
+    transform-origin: 60% 60%;
+  }
+
+  .review-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    cursor: grab;
+    scroll-behavior: smooth;
+    padding-bottom: 4px;
+  }
+
+  .review-scroll.dragging {
+    cursor: grabbing;
+  }
+
+  .review-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .review-scroll {
+    scrollbar-width: none;
+  }
+
+  .review-fade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0) 12%, rgba(255, 255, 255, 0) 88%, #ffffff 100%);
+  }
+
   .fade-in {
     animation: fadeIn 1s ease-out;
   }
@@ -81,6 +113,19 @@
     transform: translateY(-2px);
   }
 }
+
+@keyframes scissorSnip {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(-12deg) scale(1.05);
+  }
+  70% {
+    transform: rotate(12deg) scale(1.05);
+  }
+}
+
 
 html {
   scroll-behavior: smooth;

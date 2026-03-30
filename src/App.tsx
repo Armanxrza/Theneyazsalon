@@ -17,9 +17,8 @@ import {
 } from 'lucide-react';
 import logo from '../Images/Logo.png';
 import premiumGroomingImage from '../Images/Grooming.jpeg';
-import heroSlideOne from '../Images/Gallery/Images/1 (3).jpeg';
-import heroSlideTwo from '../Images/Gallery/Images/1 (14).jpeg';
-import heroSlideThree from '../Images/Gallery/Images/1 (22).jpeg';
+import heroVideoTwo from '../Images/Gallery/Videos/HeroVideo2.mp4';
+import heroVideoThree from '../Images/Gallery/Videos/HeroVideo3.mp4';
 import { craftImages, craftHighlight, craftVideos } from './galleryData';
 
 const statsData = [
@@ -38,10 +37,18 @@ function App() {
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('9:00 AM');
   const [statValues, setStatValues] = useState(statsData.map(() => 0));
+  const [isReviewDragging, setIsReviewDragging] = useState(false);
   const statsRef = useRef<HTMLDivElement | null>(null);
   const statsAnimatedRef = useRef(false);
+  const reviewScrollRef = useRef<HTMLDivElement | null>(null);
+  const reviewTrackRef = useRef<HTMLDivElement | null>(null);
+  const reviewPausedRef = useRef(false);
+  const reviewRafRef = useRef<number | null>(null);
+  const reviewDragRef = useRef({ isDragging: false, startX: 0, startScroll: 0 });
+  const reviewVelocityRef = useRef(0);
+  const reviewLastMoveRef = useRef({ x: 0, time: 0 });
 
-  const heroSlides = [premiumGroomingImage, heroSlideOne, heroSlideTwo, heroSlideThree];
+  const heroSlides = [heroVideoTwo, heroVideoThree];
 
   const serviceMenu = [
     { name: 'Haircut', price: 'NPR 250' },
@@ -84,7 +91,7 @@ function App() {
     if (reducedMotion) return;
     const interval = window.setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 6500);
+    }, 5000);
 
     return () => window.clearInterval(interval);
   }, [heroSlides.length, reducedMotion]);
@@ -151,6 +158,89 @@ function App() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const container = reviewScrollRef.current;
+    const track = reviewTrackRef.current;
+    if (!container || !track) return;
+
+    const tick = () => {
+      const loopWidth = track.scrollWidth / 2;
+      if (!reviewPausedRef.current && !reviewDragRef.current.isDragging) {
+        const baseSpeed = 0.4;
+        container.scrollLeft += baseSpeed + reviewVelocityRef.current;
+        reviewVelocityRef.current *= 0.92;
+        if (Math.abs(reviewVelocityRef.current) < 0.02) {
+          reviewVelocityRef.current = 0;
+        }
+        if (loopWidth > 0 && container.scrollLeft >= loopWidth) {
+          container.scrollLeft = 0;
+        }
+        if (loopWidth > 0 && container.scrollLeft < 0) {
+          container.scrollLeft = loopWidth;
+        }
+      }
+      reviewRafRef.current = requestAnimationFrame(tick);
+    };
+
+    reviewRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (reviewRafRef.current) {
+        cancelAnimationFrame(reviewRafRef.current);
+      }
+    };
+  }, []);
+
+  const setReviewPaused = (paused: boolean) => {
+    if (!paused && reviewDragRef.current.isDragging) return;
+    reviewPausedRef.current = paused;
+  };
+
+  const handleReviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const container = reviewScrollRef.current;
+    if (!container) return;
+    reviewDragRef.current = {
+      isDragging: true,
+      startX: event.clientX,
+      startScroll: container.scrollLeft,
+    };
+    setIsReviewDragging(true);
+    reviewPausedRef.current = true;
+    reviewVelocityRef.current = 0;
+    reviewLastMoveRef.current = { x: event.clientX, time: performance.now() };
+    container.setPointerCapture(event.pointerId);
+  };
+
+  const handleReviewPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!reviewDragRef.current.isDragging) return;
+    const container = reviewScrollRef.current;
+    if (!container) return;
+    const delta = event.clientX - reviewDragRef.current.startX;
+    container.scrollLeft = reviewDragRef.current.startScroll - delta;
+    const now = performance.now();
+    const last = reviewLastMoveRef.current;
+    const dt = Math.max(now - last.time, 1);
+    const dx = event.clientX - last.x;
+    reviewVelocityRef.current = -(dx / dt) * 12;
+    reviewLastMoveRef.current = { x: event.clientX, time: now };
+  };
+
+  const handleReviewPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const container = reviewScrollRef.current;
+    if (!container) return;
+    reviewDragRef.current.isDragging = false;
+    setIsReviewDragging(false);
+    reviewPausedRef.current = false;
+    container.releasePointerCapture(event.pointerId);
+  };
+
+  const handleReviewPointerLeave = () => {
+    if (reviewDragRef.current.isDragging) {
+      reviewDragRef.current.isDragging = false;
+      setIsReviewDragging(false);
+    }
+    reviewPausedRef.current = false;
+  };
+
   const handleBookingClick = () => {
     const whatsappNumber = '9779808488490';
     const message = [
@@ -200,16 +290,16 @@ function App() {
             </span>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-6 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-6 px-6 py-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#C6A769]/60 bg-white/10">
               <img src={logo} alt="Neyaz Salon logo" className="h-8 w-8 rounded-full object-cover" />
             </div>
             <div>
-              <div className={`text-lg sm:text-xl font-playfair font-bold ${scrolled ? 'text-[#1F2A28]' : 'text-white'}`}>
-                Neyaz Salon
+              <div className={`text-base sm:text-lg font-playfair font-bold ${scrolled ? 'text-[#1F2A28]' : 'text-white'}`}>
+                THE NEYAZ SALON
               </div>
-              <div className={`text-[11px] uppercase tracking-[0.3em] ${scrolled ? 'text-[#1F2A28]/60' : 'text-white/70'}`}>
+              <div className={`text-[10px] uppercase tracking-[0.28em] ${scrolled ? 'text-[#1F2A28]/60' : 'text-white/70'}`}>
                 Best Rated Men's Salon in the Valley
               </div>
             </div>
@@ -228,12 +318,15 @@ function App() {
           <button
             type="button"
             onClick={() => handleScrollTo('booking')}
-            className={`rounded-full px-5 py-2 text-xs sm:text-sm font-semibold transition-all duration-300 ${
+            className={`group inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] sm:text-sm font-semibold transition-all duration-300 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 ${
               scrolled
-                ? 'bg-[#1F2A28] text-white hover:bg-[#2A3836]'
-                : 'bg-white/15 text-white border border-white/40 hover:bg-white/25'
+                ? 'bg-emerald-500 text-white hover:bg-emerald-400'
+                : 'bg-emerald-400/90 text-white border border-emerald-200/70 hover:bg-emerald-300'
             }`}
           >
+            <span className="animate-scissor text-white">
+              <Scissors className="h-4 w-4" />
+            </span>
             Book Now
           </button>
         </div>
@@ -247,38 +340,46 @@ function App() {
           >
             {heroSlides.map((slide, index) => (
               <div key={`${slide}-${index}`} className="relative h-full min-w-full">
-                <img src={slide} alt="Neyaz Salon interior" className="h-full w-full object-cover" />
+                <video
+                  className="h-full w-full object-cover"
+                  src={slide}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
                 <div className="absolute inset-0 bg-black/20" />
               </div>
             ))}
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
-        <div className="relative z-10 flex min-h-screen items-center">
-          <div className="max-w-6xl mx-auto px-6 pt-40 pb-24">
-            <div className="max-w-xl text-white reveal">
-              <span className="text-[11px] uppercase tracking-[0.4em] text-white/70">Est. 2008</span>
-              <h1 className="mt-4 text-4xl sm:text-5xl md:text-6xl font-playfair font-semibold">Neyaz Salon</h1>
-              <p className="mt-4 text-base sm:text-lg text-white/80">
+        <div className="relative z-10 flex min-h-screen items-center justify-start">
+          <div className="max-w-6xl px-6 pt-32 pb-16">
+            <div className="max-w-xl text-left text-white reveal">
+              <span className="text-[10px] uppercase tracking-[0.35em] text-white/70">Est. 2008</span>
+              <h1 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-playfair font-semibold">THE NEYAZ SALON</h1>
+              <p className="mt-3 text-sm sm:text-base text-white/80">
                 Premium Unisex Salon for Modern Grooming
               </p>
-              <div className="mt-8 flex flex-wrap gap-4">
+              <div className="mt-6 flex flex-wrap justify-start gap-3">
                 <button
                   type="button"
                   onClick={() => handleScrollTo('booking')}
-                  className="bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-6 py-3 rounded-full text-sm sm:text-base font-semibold hover:shadow-2xl hover:scale-105 transition-all duration-300"
+                  className="bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold hover:shadow-2xl hover:scale-105 transition-all duration-300"
                 >
                   Book Appointment
                 </button>
                 <button
                   type="button"
                   onClick={() => handleScrollTo('services')}
-                  className="bg-white/15 text-white px-6 py-3 rounded-full text-sm sm:text-base font-semibold border border-white/40 hover:bg-white/25 transition-all duration-300"
+                  className="bg-white/15 text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold border border-white/40 hover:bg-white/25 transition-all duration-300"
                 >
                   View Services
                 </button>
               </div>
-              <div className="mt-10 inline-flex items-center gap-2 rounded-full border border-white/30 px-4 py-2 text-xs text-white/75">
+              <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/30 px-3 py-1.5 text-[11px] text-white/75">
                 <Car className="h-4 w-4 text-[#C6A769]" />
                 Car & Bike Parking Available
               </div>
@@ -287,40 +388,40 @@ function App() {
         </div>
       </section>
 
-      <section id="about" className="py-20 px-6 bg-white">
+      <section id="about" className="py-16 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">About</span>
-            <h2 className="text-4xl md:text-5xl font-playfair font-bold mt-4">Crafted for Modern Gentlemen</h2>
-            <p className="text-lg text-[#1F2A28]/70 mt-4 max-w-2xl mx-auto">
+          <div className="text-center mb-10 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">About</span>
+            <h2 className="text-3xl md:text-4xl font-playfair font-bold mt-3">Crafted for Modern Gentlemen</h2>
+            <p className="text-base text-[#1F2A28]/70 mt-3 max-w-2xl mx-auto">
               A calm, premium space designed for elevated grooming, sharp detail, and consistent excellence.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-6 hover:shadow-xl transition-all duration-500 reveal">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-xl flex items-center justify-center mb-4">
-                <Award className="text-white w-6 h-6" />
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-5 hover:shadow-xl transition-all duration-500 reveal">
+              <div className="w-10 h-10 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-xl flex items-center justify-center mb-3">
+                <Award className="text-white w-5 h-5" />
               </div>
-              <h3 className="text-xl font-playfair font-bold mb-3">Excellence</h3>
-              <p className="text-[#1F2A28]/70 leading-relaxed">
+              <h3 className="text-lg font-playfair font-bold mb-2">Excellence</h3>
+              <p className="text-sm text-[#1F2A28]/70 leading-relaxed">
                 Over 15 years of mastering the craft of premium grooming, serving discerning gentlemen who appreciate quality.
               </p>
             </div>
-            <div className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-6 hover:shadow-xl transition-all duration-500 reveal">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-xl flex items-center justify-center mb-4">
-                <Sparkles className="text-white w-6 h-6" />
+            <div className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-5 hover:shadow-xl transition-all duration-500 reveal">
+              <div className="w-10 h-10 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-xl flex items-center justify-center mb-3">
+                <Sparkles className="text-white w-5 h-5" />
               </div>
-              <h3 className="text-xl font-playfair font-bold mb-3">Luxury</h3>
-              <p className="text-[#1F2A28]/70 leading-relaxed">
+              <h3 className="text-lg font-playfair font-bold mb-2">Luxury</h3>
+              <p className="text-sm text-[#1F2A28]/70 leading-relaxed">
                 Premium products, elegant atmosphere, and personalized attention create an unmatched grooming experience.
               </p>
             </div>
-            <div className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-6 hover:shadow-xl transition-all duration-500 reveal">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-xl flex items-center justify-center mb-4">
-                <Star className="text-white w-6 h-6" />
+            <div className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-5 hover:shadow-xl transition-all duration-500 reveal">
+              <div className="w-10 h-10 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-xl flex items-center justify-center mb-3">
+                <Star className="text-white w-5 h-5" />
               </div>
-              <h3 className="text-xl font-playfair font-bold mb-3">Hygiene</h3>
-              <p className="text-[#1F2A28]/70 leading-relaxed">
+              <h3 className="text-lg font-playfair font-bold mb-2">Hygiene</h3>
+              <p className="text-sm text-[#1F2A28]/70 leading-relaxed">
                 Impeccable cleanliness standards and sterilization protocols ensure your safety and peace of mind.
               </p>
             </div>
@@ -328,51 +429,51 @@ function App() {
         </div>
       </section>
 
-      <section className="py-16 px-6 bg-[#F6F1EB]">
+      <section className="py-14 px-6 bg-[#F6F1EB]">
         <div className="max-w-6xl mx-auto" ref={statsRef}>
-          <div className="text-center mb-12 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">Our Legacy</span>
-            <h3 className="text-4xl md:text-5xl font-playfair font-bold mt-4">Numbers That Speak</h3>
+          <div className="text-center mb-10 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">Our Legacy</span>
+            <h3 className="text-3xl md:text-4xl font-playfair font-bold mt-3">Numbers That Speak</h3>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-6">
             {statsData.map((stat, index) => (
-              <div key={stat.label} className="bg-white rounded-3xl p-10 text-center shadow-xl border border-[#C6A769]/10 reveal">
-                <div className="text-5xl md:text-6xl font-playfair font-bold text-[#1F2A28]">
+              <div key={stat.label} className="bg-white rounded-3xl p-6 sm:p-8 text-center shadow-xl border border-[#C6A769]/10 reveal">
+                <div className="text-4xl md:text-5xl font-playfair font-bold text-[#1F2A28]">
                   {statValues[index]}{stat.suffix}
                 </div>
-                <p className="mt-4 text-[#1F2A28]/70 text-lg">{stat.label}</p>
+                <p className="mt-3 text-[#1F2A28]/70 text-sm sm:text-base">{stat.label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="services" className="py-24 px-6 bg-[#F6F1EB] relative overflow-hidden">
+      <section id="services" className="py-20 px-6 bg-[#F6F1EB] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#C6A769]/10 rounded-full blur-3xl"></div>
         <div className="max-w-7xl mx-auto relative">
-          <div className="text-center mb-14 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">Our Services</span>
-            <h2 className="text-5xl md:text-6xl font-playfair font-bold mt-4 mb-6">Premium Offerings</h2>
-            <p className="text-xl text-[#1F2A28]/70 max-w-2xl mx-auto">
+          <div className="text-center mb-10 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">Our Services</span>
+            <h2 className="text-3xl md:text-4xl font-playfair font-bold mt-3 mb-4">Premium Offerings</h2>
+            <p className="text-base text-[#1F2A28]/70 max-w-2xl mx-auto">
               Curated services designed for the modern gentleman
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="group bg-gradient-to-br from-white to-[#F6F1EB] rounded-3xl p-10 hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 border border-[#C6A769]/10 reveal">
-              <div className="mb-8 overflow-hidden rounded-2xl">
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="group bg-gradient-to-br from-white to-[#F6F1EB] rounded-3xl p-6 sm:p-8 hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 border border-[#C6A769]/10 reveal">
+              <div className="mb-6 overflow-hidden rounded-2xl">
                 <img
                   src={craftImages[0]?.src ?? premiumGroomingImage}
                   alt="Signature haircut"
-                  className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="h-32 sm:h-36 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
               </div>
-              <div className="w-20 h-20 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Scissors className="text-white w-10 h-10" />
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Scissors className="text-white w-7 h-7 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="text-3xl font-playfair font-bold mb-4">Signature Haircut</h3>
-              <p className="text-[#1F2A28]/70 leading-relaxed mb-8">
+              <h3 className="text-2xl sm:text-3xl font-playfair font-bold mb-3">Signature Haircut</h3>
+              <p className="text-sm sm:text-base text-[#1F2A28]/70 leading-relaxed mb-6">
                 Precision cutting techniques tailored to your face shape and personal style. Includes consultation and styling.
               </p>
               <button
@@ -385,20 +486,20 @@ function App() {
               </button>
             </div>
 
-            <div className="group bg-gradient-to-br from-white to-[#F6F1EB] rounded-3xl p-10 hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 border border-[#C6A769]/10 reveal">
-              <div className="mb-8 overflow-hidden rounded-2xl">
+            <div className="group bg-gradient-to-br from-white to-[#F6F1EB] rounded-3xl p-6 sm:p-8 hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 border border-[#C6A769]/10 reveal">
+              <div className="mb-6 overflow-hidden rounded-2xl">
                 <img
                   src={craftImages[1]?.src ?? premiumGroomingImage}
                   alt="Beard styling"
-                  className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="h-32 sm:h-36 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
               </div>
-              <div className="w-20 h-20 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Sparkles className="text-white w-10 h-10" />
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Sparkles className="text-white w-7 h-7 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="text-3xl font-playfair font-bold mb-4">Beard Styling</h3>
-              <p className="text-[#1F2A28]/70 leading-relaxed mb-8">
+              <h3 className="text-2xl sm:text-3xl font-playfair font-bold mb-3">Beard Styling</h3>
+              <p className="text-sm sm:text-base text-[#1F2A28]/70 leading-relaxed mb-6">
                 Expert beard shaping and grooming with hot towel treatment. Premium oils and balms included.
               </p>
               <button
@@ -411,20 +512,20 @@ function App() {
               </button>
             </div>
 
-            <div className="group bg-gradient-to-br from-white to-[#F6F1EB] rounded-3xl p-10 hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 border border-[#C6A769]/10 reveal">
-              <div className="mb-8 overflow-hidden rounded-2xl">
+            <div className="group bg-gradient-to-br from-white to-[#F6F1EB] rounded-3xl p-6 sm:p-8 hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 border border-[#C6A769]/10 reveal">
+              <div className="mb-6 overflow-hidden rounded-2xl">
                 <img
                   src={premiumGroomingImage}
                   alt="Premium grooming"
-                  className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="h-32 sm:h-36 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
               </div>
-              <div className="w-20 h-20 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Award className="text-white w-10 h-10" />
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-[#C6A769] to-[#D4B87E] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Award className="text-white w-7 h-7 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="text-3xl font-playfair font-bold mb-4">Premium Grooming</h3>
-              <p className="text-[#1F2A28]/70 leading-relaxed mb-8">
+              <h3 className="text-2xl sm:text-3xl font-playfair font-bold mb-3">Premium Grooming</h3>
+              <p className="text-sm sm:text-base text-[#1F2A28]/70 leading-relaxed mb-6">
                 The complete experience. Haircut, beard styling, facial treatment, and relaxation massage.
               </p>
               <button
@@ -440,44 +541,44 @@ function App() {
         </div>
       </section>
 
-      <section id="gallery" className="py-24 px-6 bg-white">
+      <section id="gallery" className="py-20 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">Gallery</span>
-            <h2 className="text-5xl md:text-6xl font-playfair font-bold mt-4">Our Craft</h2>
-            <p className="text-lg text-[#1F2A28]/70 mt-5 max-w-2xl mx-auto">
+          <div className="text-center mb-10 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">Gallery</span>
+            <h2 className="text-3xl md:text-4xl font-playfair font-bold mt-3">Our Craft</h2>
+            <p className="text-base text-[#1F2A28]/70 mt-3 max-w-2xl mx-auto">
               A curated sequence of textures, silhouettes, and in-chair details.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {craftImages.map((item) => (
               <div key={item.src} className="group relative aspect-square rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 reveal">
                 <img src={item.src} alt={item.label} className="h-full w-full object-cover" loading="lazy" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1F2A28]/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-white font-semibold">{item.label}</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1F2A28]/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                  <span className="text-white text-sm font-semibold">{item.label}</span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-8 reveal">
+          <div className="mt-6 reveal">
             <div className="relative overflow-hidden rounded-3xl aspect-[16/9] md:aspect-[21/9] shadow-2xl">
               <img src={craftHighlight.src} alt={craftHighlight.title} className="h-full w-full object-cover" loading="lazy" />
               <div className="absolute inset-0 bg-gradient-to-r from-[#1F2A28]/90 via-[#1F2A28]/30 to-transparent"></div>
-              <div className="absolute inset-0 flex flex-col justify-end gap-4 p-6 sm:p-10">
+              <div className="absolute inset-0 flex flex-col justify-end gap-3 p-5 sm:p-8">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-[#D4B87E]">See More</p>
-                  <h3 className="text-3xl sm:text-4xl font-playfair font-bold text-white mt-3">
+                  <p className="text-xs uppercase tracking-[0.3em] text-[#D4B87E]">See More</p>
+                  <h3 className="text-2xl sm:text-3xl font-playfair font-bold text-white mt-2">
                     {craftHighlight.title}
                   </h3>
-                  <p className="text-white/80 max-w-xl mt-3">
+                  <p className="text-white/80 text-sm max-w-xl mt-2">
                     {craftHighlight.description}
                   </p>
                 </div>
                 <Link
                   to="/gallery"
-                  className="w-fit bg-white text-[#1F2A28] px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300"
+                  className="w-fit bg-white text-[#1F2A28] px-5 py-2.5 rounded-full text-sm font-semibold shadow-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300"
                 >
                   See More Looks
                 </Link>
@@ -485,11 +586,11 @@ function App() {
             </div>
           </div>
 
-          <div className="mt-10">
-            <div className="flex items-center justify-between mb-6 reveal">
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-5 reveal">
               <div>
-                <p className="text-sm uppercase tracking-wider text-[#C6A769] font-semibold">In Motion</p>
-                <h3 className="text-3xl md:text-4xl font-playfair font-bold mt-2">Craft Videos</h3>
+                <p className="text-xs uppercase tracking-wider text-[#C6A769] font-semibold">In Motion</p>
+                <h3 className="text-2xl md:text-3xl font-playfair font-bold mt-2">Craft Videos</h3>
               </div>
               <div className="hidden md:flex items-center gap-2 text-sm text-[#1F2A28]/60">
                 Tap any reel to view details.
@@ -510,9 +611,9 @@ function App() {
                     />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-[#1F2A28]/80 via-transparent to-transparent"></div>
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <div className="text-white text-lg font-semibold">{video.label}</div>
-                    <p className="text-white/70 text-sm mt-1">Short reel from the Salon floor.</p>
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <div className="text-white text-base font-semibold">{video.label}</div>
+                    <p className="text-white/70 text-xs mt-1">Short reel from the Salon floor.</p>
                   </div>
                 </div>
               ))}
@@ -521,17 +622,17 @@ function App() {
         </div>
       </section>
 
-      <section id="booking" className="py-24 px-6 bg-[#F6F1EB]">
+      <section id="booking" className="py-20 px-6 bg-[#F6F1EB]">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">Book Your Visit</span>
-            <h2 className="text-5xl md:text-6xl font-playfair font-bold mt-4 mb-6">Reserve Your Slot</h2>
-            <p className="text-xl text-[#1F2A28]/70">
+          <div className="text-center mb-10 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">Book Your Visit</span>
+            <h2 className="text-4xl md:text-5xl font-playfair font-bold mt-3 mb-4">Reserve Your Slot</h2>
+            <p className="text-base text-[#1F2A28]/70">
               Experience luxury grooming at your convenience
             </p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-10 shadow-2xl border border-[#C6A769]/10 reveal">
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#C6A769]/10 reveal">
             <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-8">
               <div className="space-y-6">
                 <div className="grid sm:grid-cols-2 gap-5">
@@ -539,7 +640,7 @@ function App() {
                     <label className="block text-sm font-semibold mb-2 text-[#1F2A28]/80">Full Name</label>
                     <input
                       type="text"
-                      className="w-full px-5 py-3.5 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
                       placeholder="John Doe"
                       value={bookingName}
                       onChange={(event) => setBookingName(event.target.value)}
@@ -549,7 +650,7 @@ function App() {
                     <label className="block text-sm font-semibold mb-2 text-[#1F2A28]/80">Phone Number</label>
                     <input
                       type="tel"
-                      className="w-full px-5 py-3.5 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
                       placeholder="+977 980-8488490"
                       value={bookingPhone}
                       onChange={(event) => setBookingPhone(event.target.value)}
@@ -558,7 +659,7 @@ function App() {
                   <div>
                     <label className="block text-sm font-semibold mb-2 text-[#1F2A28]/80">Service</label>
                     <select
-                      className="w-full px-5 py-3.5 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
                       value={bookingService}
                       onChange={(event) => setBookingService(event.target.value)}
                     >
@@ -573,7 +674,7 @@ function App() {
                     <label className="block text-sm font-semibold mb-2 text-[#1F2A28]/80">Preferred Date</label>
                     <input
                       type="date"
-                      className="w-full px-5 py-3.5 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
                       value={bookingDate}
                       onChange={(event) => setBookingDate(event.target.value)}
                     />
@@ -581,7 +682,7 @@ function App() {
                   <div>
                     <label className="block text-sm font-semibold mb-2 text-[#1F2A28]/80">Preferred Time</label>
                     <select
-                      className="w-full px-5 py-3.5 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#1F2A28]/10 focus:border-[#C6A769] outline-none transition-colors bg-white"
                       value={bookingTime}
                       onChange={(event) => setBookingTime(event.target.value)}
                     >
@@ -599,17 +700,17 @@ function App() {
                 <button
                   type="button"
                   onClick={handleBookingClick}
-                  className="w-full bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-8 py-4 rounded-xl font-semibold hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3"
+                  className="w-full bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-6 py-3 rounded-xl text-sm font-semibold hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
                 >
-                  <Calendar className="w-5 h-5" />
+                  <Calendar className="w-4 h-4" />
                   Book Your Slot
                 </button>
               </div>
 
               <div className="space-y-6">
-                <div className="bg-[#F6F1EB]/80 rounded-2xl p-6 border border-[#C6A769]/10">
-                  <h3 className="text-xl font-playfair font-bold mb-4">Booking Snapshot</h3>
-                  <div className="space-y-3 text-sm text-[#1F2A28]/70">
+                <div className="bg-[#F6F1EB]/80 rounded-2xl p-5 border border-[#C6A769]/10">
+                  <h3 className="text-lg font-playfair font-bold mb-3">Booking Snapshot</h3>
+                  <div className="space-y-2 text-xs sm:text-sm text-[#1F2A28]/70">
                     <div className="flex items-center justify-between gap-4">
                       <span>Selected Service</span>
                       <span className="text-right text-[#1F2A28] font-semibold">{bookingService}</span>
@@ -624,25 +725,25 @@ function App() {
                     </div>
                   </div>
                 </div>
-                <div className="bg-white/70 rounded-2xl p-6 border border-[#1F2A28]/10">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="bg-white/70 rounded-2xl p-5 border border-[#1F2A28]/10">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-sm uppercase tracking-wider text-[#1F2A28]/60">Popular Picks</p>
-                      <h3 className="text-xl font-playfair font-bold">Quick Menu</h3>
+                      <p className="text-xs uppercase tracking-wider text-[#1F2A28]/60">Popular Picks</p>
+                      <h3 className="text-lg font-playfair font-bold">Quick Menu</h3>
                     </div>
                     <div className="rounded-full bg-[#C6A769]/20 px-3 py-1 text-xs font-semibold text-[#1F2A28]">Updated</div>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {serviceMenu.slice(0, 4).map((service) => (
-                      <div key={service.name} className="flex items-center justify-between gap-6 text-sm">
+                      <div key={service.name} className="flex items-center justify-between gap-6 text-xs sm:text-sm">
                         <span className="text-[#1F2A28]/80">{service.name}</span>
                         <span className="font-semibold text-[#1F2A28]">{service.price}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 border border-[#1F2A28]/10 text-sm text-[#1F2A28]/70">
-                  <Car className="w-4 h-4 text-[#C6A769]" />
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 border border-[#1F2A28]/10 text-xs sm:text-sm text-[#1F2A28]/70">
+                  <Car className="w-3.5 h-3.5 text-[#C6A769]" />
                   Car & Bike Parking Available
                 </div>
               </div>
@@ -651,125 +752,159 @@ function App() {
         </div>
       </section>
 
-      <section id="reviews" className="py-24 px-6 bg-white">
+      <section id="reviews" className="py-16 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">Google Reviews</span>
-            <h2 className="text-4xl md:text-5xl font-playfair font-bold mt-4">
+          <div className="text-center mb-8 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">Google Reviews</span>
+            <h2 className="text-2xl md:text-3xl font-playfair font-bold mt-2">
               Best Rated Men's Salon In Kathmandu Valley
             </h2>
-            <p className="mt-5 text-lg text-[#1F2A28]/70">4.9/5 Rated on Google Reviews</p>
+            <p className="mt-2 text-xs sm:text-sm text-[#1F2A28]/70">4.9/5 Rated on Google Reviews</p>
             <a
               href="https://www.google.com/search?sxsrf=ANbL-n5bfmpaG8bleKbYKgpw7yj9lcGqXA:1774787722889&si=AL3DRZEsmMGCryMMFSHJ3StBhOdZ2-6yYkXd_doETEE1OR-qOUV-O-G1odEiK4nPUUGUf0wRnPX6SCOHdO6F5zYy5_IrnxkmXmUb7aF_Uig42WzzQwA-Q2z2Bu7kNqgxRlGhLgpBHSyOP1ZWZXtKJUt2LvWm_PAwSQ%3D%3D&q=The+neyaz+saloon+Reviews"
               target="_blank"
               rel="noreferrer"
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#C6A769]/30 px-5 py-2 text-sm font-semibold text-[#1F2A28] hover:bg-[#C6A769]/10 transition-all"
+              className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#C6A769]/30 px-4 py-2 text-xs font-semibold text-[#1F2A28] hover:bg-[#C6A769]/10 transition-all"
             >
               View Google Reviews
               <span aria-hidden="true">↗</span>
             </a>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { name: "Arman Reza", role: "IT Security, TU", text: "Impeccable service and a calm, premium vibe. My cut was sharp, clean, and exactly what I asked for." },
-              { name: "Sonu Kumar Maurya", role: "CEO & Founder, ZIEC Consultancy", text: "Friendly staff and true attention to detail. The grooming felt luxurious without being rushed." },
-              { name: "Dipesh Thapa", role: "Student, KIST College", text: "Outstanding craftsmanship every visit. The finish is precise, and the experience is consistently relaxing." }
-            ].map((testimonial, idx) => (
-              <div key={idx} className="bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-3xl p-10 hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-500 reveal">
-                <div className="flex gap-1 mb-6">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-[#C6A769] fill-[#C6A769]" />
-                  ))}
-                </div>
-                <p className="text-[#1F2A28]/80 leading-relaxed mb-8 text-lg">
-                  "{testimonial.text}"
-                </p>
-                <div>
-                  <div className="font-bold text-lg">{testimonial.name}</div>
-                  <div className="text-sm text-[#1F2A28]/60">{testimonial.role}</div>
-                </div>
+          <div className="relative">
+            <div className="review-fade" aria-hidden="true" />
+            <div
+              ref={reviewScrollRef}
+              className={`review-scroll ${isReviewDragging ? 'dragging' : ''}`}
+              onPointerDown={handleReviewPointerDown}
+              onPointerMove={handleReviewPointerMove}
+              onPointerUp={handleReviewPointerUp}
+              onPointerLeave={handleReviewPointerLeave}
+              onPointerCancel={handleReviewPointerLeave}
+            >
+              <div ref={reviewTrackRef} className="flex w-max gap-4">
+                {(() => {
+                  const reviews = [
+                    {
+                      name: 'Milan Rayamajhi',
+                      time: '8 months ago',
+                      text: 'Amazing experience! The staff was super friendly, the space was clean and relaxing, and my stylist nailed the look I wanted. Left feeling refreshed and confident. Highly recommend!',
+                    },
+                    {
+                      name: 'AJIT THAPA',
+                      time: 'a year ago',
+                      text: 'Good Haircut with Experienced, Hygienic & Professional staffs',
+                    },
+                    {
+                      name: 'WISIL_81 *_*',
+                      time: 'a year ago',
+                      text: 'Best haircut salon in the town!! been trimming my hair in this salon since last 3 years and mevwr any regrets!! do visit the neyaz salon',
+                    },
+                  ];
+                  const shifted = reviews.length > 1 ? [...reviews.slice(1), reviews[0]] : reviews;
+                  return [...reviews, ...shifted].map((review, idx) => (
+                    <div
+                      key={`${review.name}-${idx}`}
+                      onMouseEnter={() => setReviewPaused(true)}
+                      onMouseLeave={() => setReviewPaused(false)}
+                      className="min-w-[220px] sm:min-w-[250px] md:min-w-[280px] max-w-[300px] bg-gradient-to-br from-[#F6F1EB] to-[#E8DED2] rounded-2xl p-4 sm:p-5 shadow-md hover:shadow-lg transition-all duration-300 reveal"
+                    >
+                      <div className="flex items-center gap-1 text-[#C6A769]">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="h-4 w-4 fill-[#C6A769]" />
+                        ))}
+                      </div>
+                      <p className="mt-3 text-sm text-[#1F2A28]/80 leading-relaxed">
+                        "{review.text}"
+                      </p>
+                      <div className="mt-4">
+                        <div className="text-sm font-semibold">{review.name}</div>
+                        <div className="text-xs text-[#1F2A28]/60">{review.time}</div>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="py-28 px-6 bg-gradient-to-br from-[#1F2A28] to-[#2A3836] relative overflow-hidden">
+      <section className="py-20 px-6 bg-gradient-to-br from-[#1F2A28] to-[#2A3836] relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-96 h-96 bg-[#C6A769] rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#C6A769] rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-4xl mx-auto text-center relative reveal">
-          <h2 className="text-5xl md:text-7xl font-playfair font-bold text-white mb-6">
+          <h2 className="text-4xl md:text-5xl font-playfair font-bold text-white mb-4">
             Classic Cuts.<br />Modern Looks.
           </h2>
-          <p className="text-xl text-white/70 mb-8 max-w-2xl mx-auto">
+          <p className="text-base text-white/70 mb-6 max-w-2xl mx-auto">
             Experience the perfect fusion of timeless barbering tradition and contemporary style.
           </p>
           <button
             type="button"
             onClick={() => handleScrollTo('booking')}
-            className="bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-12 py-5 rounded-full font-semibold text-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
+            className="bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-8 py-3 rounded-full font-semibold text-sm hover:shadow-2xl hover:scale-105 transition-all duration-300"
           >
             Book Your Appointment
           </button>
         </div>
       </section>
 
-      <section id="contact" className="py-24 px-6 bg-[#F6F1EB]">
+      <section id="contact" className="py-20 px-6 bg-[#F6F1EB]">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 reveal">
-            <span className="text-[#C6A769] font-semibold text-sm tracking-wider uppercase">Visit Us</span>
-            <h2 className="text-5xl md:text-6xl font-playfair font-bold mt-4">Find The Salon</h2>
-            <p className="text-xl text-[#1F2A28]/70 mt-4">A calm, refined space in the heart of the city.</p>
+          <div className="text-center mb-10 reveal">
+            <span className="text-[#C6A769] font-semibold text-xs tracking-wider uppercase">Visit Us</span>
+            <h2 className="text-4xl md:text-5xl font-playfair font-bold mt-3">Find The Salon</h2>
+            <p className="text-base text-[#1F2A28]/70 mt-3">A calm, refined space in the heart of the city.</p>
           </div>
 
-          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-stretch">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 items-stretch">
             <div className="rounded-3xl overflow-hidden shadow-2xl border border-[#C6A769]/20 reveal">
               <iframe
                 title="The Neyaz Salon location"
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d28258.87836300308!2d85.29561996459962!3d27.706175347247026!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39eb199ef6d98e2d%3A0x736556f3a203a626!2sThe%20neyaz%20saloon!5e0!3m2!1sen!2snp!4v1770459333215!5m2!1sen!2snp"
-                className="w-full h-[420px] md:h-[520px]"
+                className="w-full h-[320px] md:h-[420px]"
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 allowFullScreen
               ></iframe>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-10 shadow-2xl border border-[#C6A769]/10 flex flex-col justify-between reveal">
+            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#C6A769]/10 flex flex-col justify-between reveal">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#C6A769]/15 px-4 py-2 text-sm font-semibold text-[#1F2A28]">
-                  <MapPin className="w-4 h-4" />
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#C6A769]/15 px-3 py-1.5 text-xs font-semibold text-[#1F2A28]">
+                  <MapPin className="w-3.5 h-3.5" />
                   Prime Location
                 </div>
-                <h3 className="text-3xl font-playfair font-bold mt-6 mb-4">The Neyaz Salon</h3>
-                <p className="text-[#1F2A28]/70 leading-relaxed">
+                <h3 className="text-2xl font-playfair font-bold mt-4 mb-3">The Neyaz Salon</h3>
+                <p className="text-sm text-[#1F2A28]/70 leading-relaxed">
                   Maitidevi, Kathmandu. Easy to reach, with a calm, elegant atmosphere just off the main road.
                 </p>
               </div>
 
-              <div className="mt-10 space-y-4 text-[#1F2A28]/70">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-[#C6A769]" />
+              <div className="mt-8 space-y-3 text-sm text-[#1F2A28]/70">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#C6A769]" />
                   <span>Daily: 7:30 AM - 9:30 PM</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-[#C6A769]" />
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-[#C6A769]" />
                   <span>+977 980-8488490</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-[#C6A769]" />
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-[#C6A769]" />
                   <span>neyazsalon@gmail.com</span>
                 </div>
               </div>
 
-              <div className="mt-10">
+              <div className="mt-8">
                 <a
                   href="https://www.google.com/maps/dir/?api=1&destination=The%20Neyaz%20Salon%2C%20Maitidevi%2C%20Kathmandu"
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full inline-flex items-center justify-center bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-8 py-4 rounded-full font-semibold hover:shadow-2xl hover:scale-[1.02] transition-all duration-300"
+                  className="w-full inline-flex items-center justify-center bg-gradient-to-r from-[#C6A769] to-[#D4B87E] text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-2xl hover:scale-[1.02] transition-all duration-300"
                 >
                   Get Directions
                 </a>
@@ -779,52 +914,52 @@ function App() {
         </div>
       </section>
 
-      <footer className="bg-[#1F2A28] text-white py-16 px-6">
+      <footer className="bg-[#1F2A28] text-white py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+          <div className="grid md:grid-cols-4 gap-10 mb-10">
             <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <img src={logo} alt="The Neyaz Salon logo" className="h-12 w-12 rounded-full object-cover" />
-                <div className="text-2xl font-playfair font-bold">The Neyaz Salon</div>
+                <img src={logo} alt="The Neyaz Salon logo" className="h-10 w-10 rounded-full object-cover" />
+                <div className="text-xl font-playfair font-bold">The Neyaz Salon</div>
               </div>
-              <p className="text-white/60 leading-relaxed">
+              <p className="text-sm text-white/60 leading-relaxed">
                 Premium grooming experience for the modern gentleman.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-lg mb-6">Quick Links</h4>
+              <h4 className="font-bold text-base mb-4">Quick Links</h4>
               <div className="space-y-3">
-                <Link to="/about" className="block text-white/60 hover:text-[#C6A769] transition-colors">Message from Owner</Link>
-                <a href="#reviews" className="block text-white/60 hover:text-[#C6A769] transition-colors">Client Reviews</a>
-                <a href="#gallery" className="block text-white/60 hover:text-[#C6A769] transition-colors">Gallery</a>
-                <a href="#contact" className="block text-white/60 hover:text-[#C6A769] transition-colors">Contact</a>
+                <Link to="/about" className="block text-sm text-white/60 hover:text-[#C6A769] transition-colors">Message from Owner</Link>
+                <a href="#reviews" className="block text-sm text-white/60 hover:text-[#C6A769] transition-colors">Client Reviews</a>
+                <a href="#gallery" className="block text-sm text-white/60 hover:text-[#C6A769] transition-colors">Gallery</a>
+                <a href="#contact" className="block text-sm text-white/60 hover:text-[#C6A769] transition-colors">Contact</a>
               </div>
             </div>
 
             <div>
-              <h4 className="font-bold text-lg mb-6">Hours</h4>
-              <div className="space-y-3 text-white/60">
+              <h4 className="font-bold text-base mb-4">Hours</h4>
+              <div className="space-y-3 text-sm text-white/60">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
+                  <Clock className="w-3.5 h-3.5" />
                   <span>Daily: 7:30 AM - 9:30 PM</span>
                 </div>
               </div>
             </div>
 
             <div>
-              <h4 className="font-bold text-lg mb-6">Contact</h4>
-              <div className="space-y-3 text-white/60">
+              <h4 className="font-bold text-base mb-4">Contact</h4>
+              <div className="space-y-3 text-sm text-white/60">
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
+                  <MapPin className="w-3.5 h-3.5" />
                   <span>Maitidevi, Kathmandu</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
+                  <Phone className="w-3.5 h-3.5" />
                   <span>+977 980-8488490</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
+                  <Mail className="w-3.5 h-3.5" />
                   <span>theneyazsalon@gmail.com</span>
                 </div>
               </div>
@@ -832,7 +967,7 @@ function App() {
           </div>
 
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="text-white/40 text-sm">
+            <p className="text-white/40 text-xs">
               © 2026 The Neyaz Salon. All rights reserved. Website designed by{' '}
               <a
                 href="https://www.linkedin.com/in/armanxreza"
